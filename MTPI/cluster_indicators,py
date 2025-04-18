@@ -1,0 +1,139 @@
+import os
+import json
+import numpy as np
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.cluster import KMeans
+
+FEATURES_PATH = "features/indicator_profiles.json"
+CLUSTER_OUTPUT_PATH = "features/strategy_clusters.json"
+SETTINGS_DIR = "settings"
+
+# Configurable
+N_CLUSTERS = 1
+
+def load_indicator_features():
+    with open(FEATURES_PATH, "r") as f:
+        return json.load(f)
+
+def extract_feature_matrix(profiles):
+    names = []
+    features = []
+
+    for name, props in profiles.items():
+        if "preferred_timeframe" not in props:
+            continue  # must be scaled
+
+        fvec = [
+            props.get("mae_vs_isp", 0),
+            props.get("correlation_vs_isp", 0),
+            props.get("sharpe_ratio", 0),
+            props.get("omega_ratio", 0),
+            props.get("transition_frequency", 0),
+            props.get("avg_holding_period", 0)
+        ]
+        names.append(name)
+        features.append(fvec)
+
+    return names, np.array(features)
+
+import importlib
+import numpy as np
+import json
+import os
+
+SETTINGS_DIR = "settings"
+DATA_PATH = "CSVdata/target.csv"
+
+def load_data():
+    df = pd.read_csv(DATA_PATH)
+    df["DateTime"] = pd.to_datetime(df["time"], unit="s")
+    df.set_index("DateTime", inplace=True)
+    df["manual_signal"] = df["manual_signal"].ffill().fillna(0)
+    return df
+
+def select_dynamic_settings(indicator_name, top_n=2, perturb_pct=0.1):
+    df = load_data()
+    module = importlib.import_module(f"indicators.{indicator_name}")
+
+    settings_path = os.path.join(SETTINGS_DIR, f"{indicator_name}_settings.json")
+    with open(settings_path, "r") as f:
+        settings = json.load(f)
+
+    base_signal = module.final_signal(df.copy(), timeframe="1D")
+    signal_base = np.array(base_signal)
+
+    impact_scores = {}
+
+    for param, value in settings.items():
+        if isinstance(value, (int, float)):
+            delta = value * perturb_pct if value != 0 else 1.0
+            variants = [
+                {**settings, param: value + delta},
+                {**settings, param: value - delta}
+            ]
+
+            variances = []
+            for var in variants:
+                # Patch settings to module temporarily
+                temp_path = os.path.join(SETTINGS_DIR, f"temp_{indicator_name}.json")
+                with open(temp_path, "w") as tf:
+                    json.dump(var, tf)
+
+                os.replace(temp_path, settings_path)  # ✅ safe overwrite
+
+                pert_signal = module.final_signal(df.copy(), timeframe="1D")
+                variances.append(np.mean(np.abs(signal_base - np.array(pert_signal))))
+
+            avg_impact = np.mean(variances)
+            impact_scores[param] = avg_impact
+
+    # Restore original settings
+    with open(settings_path, "w") as f:
+        json.dump(settings, f)
+
+    top_params = sorted(impact_scores.items(), key=lambda x: -x[1])[:top_n]
+    return {k: settings[k] for k, _ in top_params}
+
+
+def build_clusters(names, labels, profiles):
+    cluster_map = {}
+    for idx, cluster_id in enumerate(labels):
+        strat_key = f"S{cluster_id + 1}"
+        if strat_key not in cluster_map:
+            cluster_map[strat_key] = []
+
+        name = names[idx]
+        indicator_profile = profiles[name]
+        cluster_map[strat_key].append({
+            "name": name,
+            "preferred_timeframe": indicator_profile.get("preferred_timeframe"),
+            "settings_subset": select_dynamic_settings(name),
+            "tempo_label": None  # to be assigned manually or via classifier later
+        })
+
+    return cluster_map
+
+def main():
+    profiles = load_indicator_features()
+    names, X = extract_feature_matrix(profiles)
+
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    pca = PCA(n_components=1)
+    X_pca = pca.fit_transform(X_scaled)
+
+    kmeans = KMeans(n_clusters=N_CLUSTERS, random_state=42)
+    labels = kmeans.fit_predict(X_pca)
+
+    strategy_clusters = build_clusters(names, labels, profiles)
+
+    with open(CLUSTER_OUTPUT_PATH, "w") as f:
+        json.dump(strategy_clusters, f, indent=4)
+
+    print(f"✅ Strategy clusters saved to {CLUSTER_OUTPUT_PATH}")
+
+if __name__ == "__main__":
+    main()
