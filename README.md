@@ -61,5 +61,5 @@ The MTPI framework is designed to:
 ---
 
 
-**# © 2025 azank1 / Neuronet. All Rights Reserved.**
+**# © 2025 azank1 . All Rights Reserved.**
 
