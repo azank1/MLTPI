@@ -1,4 +1,3 @@
-# © 2025 azank1 / Neuronet. All Rights Reserved.
 
  Medium-Term Probabilistic Indicator (MTPI)
 
@@ -62,4 +61,5 @@ The MTPI framework is designed to:
 ---
 
 
+**# © 2025 azank1 / Neuronet. All Rights Reserved.**
 
