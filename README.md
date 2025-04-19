@@ -26,7 +26,7 @@ The MTPI framework is designed to:
 
 ---
 
-## ⚙️ Features
+##  Features
 
 - Modular indicator pipeline with plug-and-play architecture
 - Behavioral profiling using:
@@ -40,7 +40,7 @@ The MTPI framework is designed to:
 
 ---
 
-## 🚀 Current Capabilities
+##  Current Capabilities
 
 - Supports multiple indicators like AGMA, QTrend, HullSuite, and more.
 - Feature-based clustering for forming coherent strategy groups (S1, S2, ...).
@@ -59,5 +59,5 @@ The MTPI framework is designed to:
 
 ---
 
-## 📁 Directory Structure
+
 
