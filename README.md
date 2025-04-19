@@ -1,3 +1,5 @@
+# © 2025 azank1 / Neuronet. All Rights Reserved.
+
  Medium-Term Probabilistic Indicator (MTPI)
 
 **MLTPI** is a modular, ML-powered signal engineering framework that evolves multi-indicator trading strategies based on statistical behavior and optimized portfolio logic.
