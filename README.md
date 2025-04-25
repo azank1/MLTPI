@@ -19,7 +19,7 @@ The MTPI framework is designed to:
 
 ---
 
-## 🔍 Scope
+##  Scope
 
 - Applicable to **any asset class** (crypto, equity, commodities, etc.) where a quality training signal (manual ISP) is provided.
 - Designed to extract **market alpha** through intelligent signal stacking and attenuation.
@@ -51,7 +51,7 @@ The MTPI framework is designed to:
 
 ---
 
-## 🔧 Tech Stack
+##  Tech Stack
 
 - Python / Pandas / NumPy
 - Scikit-learn (ML models)
