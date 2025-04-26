@@ -5,7 +5,7 @@
             "preferred_timeframe": "2D",
             "settings_subset": {
                 "adaptive": false,
-                "length": 39
+                "length": 37
             },
             "tempo_label": null
         },
@@ -13,8 +13,8 @@
             "name": "qtrend",
             "preferred_timeframe": "1D",
             "settings_subset": {
-                "trend_period": 113,
-                "atr_mult": 1.4363502971184063
+                "use_ema": false,
+                "trend_period": 81
             },
             "tempo_label": null
         }
