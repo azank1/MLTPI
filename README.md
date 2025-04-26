@@ -1,5 +1,5 @@
 
- Medium-Term Probabilistic Indicator (MTPI)
+ Machine-Learning Trend Probability Indicator (MLTPI)
 
 **MLTPI** is a modular, ML-powered signal engineering framework that evolves multi-indicator trading strategies based on statistical behavior and optimized portfolio logic.
 
