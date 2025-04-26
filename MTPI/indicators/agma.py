@@ -86,9 +86,10 @@ def train_indicator(df, output_path):
         agma_series = compute_agma(df, length, adaptive, volatilityPeriod, sigma_fixed)
         signal = np.where(df["close"] >= (agma_series + thresh), 1, -1)
         target_signal = df["manual_signal"].astype(int).values
-
+        
         mae = compute_mae(signal, target_signal)
         penalty = compute_transition_penalty(signal)
+
         return -(mae + penalty)
 
     pbounds = {

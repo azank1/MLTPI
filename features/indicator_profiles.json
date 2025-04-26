@@ -1,27 +1,27 @@
 {
     "agma": {
-        "mae_vs_isp": 0.6465,
-        "correlation_vs_isp": 0.5931,
-        "signal_count": 106,
-        "sharpe_ratio": 0.0821,
-        "omega_ratio": 1.1513,
-        "transition_frequency": 0.0264,
-        "avg_holding_period": 36.3,
-        "length": 38,
+        "mae_vs_isp": 0.4343,
+        "correlation_vs_isp": 0.5899,
+        "signal_count": 110,
+        "sharpe_ratio": 0.0918,
+        "omega_ratio": 1.1841,
+        "transition_frequency": 0.0286,
+        "avg_holding_period": 33.22,
+        "length": 37,
         "adaptive": false,
-        "volatilityPeriod": 24,
+        "volatilityPeriod": 30,
         "preferred_timeframe": "2D",
-        "score": -38.6294
+        "score": -37.9971
     },
     "qtrend": {
-        "mae_vs_isp": 0.7697,
-        "correlation_vs_isp": 0.2189,
+        "mae_vs_isp": 0.5388,
+        "correlation_vs_isp": 0.4936,
         "signal_count": 16,
-        "sharpe_ratio": 0.0313,
-        "omega_ratio": 1.0899,
-        "transition_frequency": 0.0028,
-        "avg_holding_period": 213.0,
-        "preferred_timeframe": "2D",
-        "score": -39.8697
+        "sharpe_ratio": 0.0531,
+        "omega_ratio": 1.1038,
+        "transition_frequency": 0.0088,
+        "avg_holding_period": 113.73,
+        "preferred_timeframe": "1D",
+        "score": -39.2474
     }
 }
