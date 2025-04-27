@@ -1,16 +1,27 @@
+# indicators/agma.py
+
 import os
 import json
 import numpy as np
 import pandas as pd
-from bayes_opt import BayesianOptimization
+import BayesianOptimization
+
+# === Constants ===
+SETTINGS_DIR = "settings"
+SETTINGS_FILE = "agma_settings.json"
 
 # === Settings Loader ===
-def load_json_settings(settings_path):
-    with open(settings_path, 'r') as f:
-        return json.load(f)
+def load_settings(settings=None):
+    if settings is None:
+        with open(os.path.join(SETTINGS_DIR, SETTINGS_FILE), "r") as f:
+            settings = json.load(f)
+    return settings
 
 # === Core AGMA Computation ===
 def compute_agma(df, length, adaptive, volatilityPeriod, sigma_fixed):
+    """
+    Compute AGMA values based on close price and provided parameters.
+    """
     close = df["close"]
     agma_values = [np.nan] * (length - 1)
 
@@ -33,15 +44,18 @@ def compute_agma(df, length, adaptive, volatilityPeriod, sigma_fixed):
             value = val_high + val_low
             sum_val += value * weight
             sum_w += weight
+
         agma = (sum_val / sum_w) / 2
         agma_values.append(agma)
 
     return pd.Series(agma_values, index=df.index)
 
 # === Final Signal Interface ===
-def final_signal(df, timeframe="1D"):
-    settings_path = os.path.join("settings", "agma_settings.json")
-    settings = load_json_settings(settings_path)
+def final_signal(df, timeframe="1D", settings=None):
+    """
+    Main public method to generate AGMA signals.
+    """
+    settings = load_settings(settings)
 
     length = int(settings.get("length", 20))
     volatilityPeriod = int(settings.get("volatilityPeriod", 10))
@@ -61,14 +75,20 @@ def final_signal(df, timeframe="1D"):
         df_resampled = df.copy()
 
     agma_series = compute_agma(df_resampled, length, adaptive, volatilityPeriod, sigma_fixed)
+
+    # Generate binary signal
     binary_signal = np.where(df_resampled["close"] >= (agma_series + thresh), 1, -1)
     signal_series = pd.Series(binary_signal, index=df_resampled.index)
 
     aligned_signal = signal_series.reindex(df.index, method='ffill').fillna(-1).astype(int)
     return aligned_signal.values
 
-# === Training Routine ===
+# === Training Interface ===
 def train_indicator(df, output_path):
+    """
+    Bayesian optimization to find best AGMA parameters.
+    Saves the settings to output_path.
+    """
     def compute_mae(signal, target):
         return np.mean(np.abs(signal - target))
 
@@ -85,10 +105,11 @@ def train_indicator(df, output_path):
 
         agma_series = compute_agma(df, length, adaptive, volatilityPeriod, sigma_fixed)
         signal = np.where(df["close"] >= (agma_series + thresh), 1, -1)
+        signal = pd.Series(signal, index=df.index).fillna(-1).astype(int)
+
         target_signal = df["manual_signal"].astype(int).values
-        
-        mae = compute_mae(signal, target_signal)
-        penalty = compute_transition_penalty(signal)
+        mae = compute_mae(signal.values, target_signal)
+        penalty = compute_transition_penalty(signal.values)
 
         return -(mae + penalty)
 
@@ -109,7 +130,7 @@ def train_indicator(df, output_path):
     optimizer.maximize(init_points=5, n_iter=30)
 
     best = optimizer.max["params"]
-    settings = {
+    best_settings = {
         "length": int(round(best["length"])),
         "volatilityPeriod": int(round(best["volatilityPeriod"])),
         "sigma_fixed": float(best["sigma_fixed"]),
@@ -119,6 +140,6 @@ def train_indicator(df, output_path):
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w") as f:
-        json.dump(settings, f, indent=4)
+        json.dump(best_settings, f, indent=4)
 
-    print(f"✅ AGMA training complete. Settings saved to {output_path}")
+    print(f"✅ AGMA training complete. Best settings saved to {output_path}")

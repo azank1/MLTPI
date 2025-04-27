@@ -1,23 +1,37 @@
+# indicators/qtrend.py
+
 import os
 import json
-from bayes_opt import BayesianOptimization
 import numpy as np
 import pandas as pd
+from bayes_opt import BayesianOptimization
 
-# === Settings Loader ===
-def load_json_settings(settings_path):
-    with open(settings_path, 'r') as f:
-        return json.load(f)
+# === Constants ===
+SETTINGS_DIR = "settings"
+SETTINGS_FILE = "qtrend_settings.json"
+
+# === Load Settings ===
+def load_settings(settings=None):
+    if settings is None:
+        with open(os.path.join(SETTINGS_DIR, SETTINGS_FILE), "r") as f:
+            settings = json.load(f)
+    return settings
 
 # === Core Q-Trend Logic ===
-def compute_qtrend(df, trend_period, atr_period, atr_mult, mode, use_ema, ema_period):
-    """
-    Compute Q-Trend signal core (without resampling).
-    
-    Returns:
-        pd.Series of +1/-1 signals indexed to df
-    """
-    src = df["close"]
+def compute_qtrend(df, trend_period, atr_period, atr_mult, mode, use_ema, ema_period, source="close"):
+    """Compute Q-Trend signal based on source price."""
+    if source not in df.columns:
+        if source == "hl2":
+            src = (df["high"] + df["low"]) / 2
+        elif source == "hlc3":
+            src = (df["high"] + df["low"] + df["close"]) / 3
+        elif source == "ohlc4":
+            src = (df["open"] + df["high"] + df["low"] + df["close"]) / 4
+        else:
+            src = df["close"]
+    else:
+        src = df[source]
+
     if use_ema:
         src = src.ewm(span=ema_period, adjust=False).mean()
 
@@ -26,7 +40,7 @@ def compute_qtrend(df, trend_period, atr_period, atr_mult, mode, use_ema, ema_pe
     d = h - l
     m = (h + l) / 2
 
-    atr = df["high"].subtract(df["low"]).rolling(atr_period).mean()
+    atr = (df["high"] - df["low"]).rolling(atr_period).mean()
     epsilon = atr_mult * atr
 
     if mode == "Type B":
@@ -41,17 +55,27 @@ def compute_qtrend(df, trend_period, atr_period, atr_mult, mode, use_ema, ema_pe
     return signal
 
 # === Final Signal Interface ===
-def final_signal(df, timeframe="1D"):
-    settings_path = os.path.join("settings", "qtrend_settings.json")
-    settings = load_json_settings(settings_path)
+def final_signal(df, timeframe="1D", settings=None):
+    """
+    Main public entry for Q-Trend signal generation.
+    Args:
+        df (pd.DataFrame): Price data.
+        timeframe (str): Timeframe like '1D'.
+        settings (dict or None): If None, loads from disk.
+    Returns:
+        np.ndarray: Final signal array (-1, 1).
+    """
+    settings = load_settings(settings)
 
     trend_period = int(settings.get("trend_period", 200))
     atr_period = int(settings.get("atr_period", 14))
     atr_mult = float(settings.get("atr_mult", 1.0))
     mode = settings.get("mode", "Type A")
-    use_ema = settings.get("use_ema", False)
+    use_ema = bool(settings.get("use_ema", False))
     ema_period = int(settings.get("ema_period", 3))
+    source = settings.get("source", "close")
 
+    # Resample if needed
     if timeframe != "1D":
         df_resampled = df.resample(timeframe).agg({
             'open': 'first',
@@ -63,15 +87,25 @@ def final_signal(df, timeframe="1D"):
     else:
         df_resampled = df.copy()
 
-    signal_series = compute_qtrend(df_resampled, trend_period, atr_period, atr_mult, mode, use_ema, ema_period)
+    signal_series = compute_qtrend(
+        df_resampled,
+        trend_period,
+        atr_period,
+        atr_mult,
+        mode,
+        use_ema,
+        ema_period,
+        source
+    )
+
+    # Realign to original dataframe
     aligned_signal = signal_series.reindex(df.index, method='ffill').fillna(-1).astype(int)
     return aligned_signal.values
 
+# === Training Interface ===
 def train_indicator(df, output_path):
     """
-    Trains Q-Trend using Bayesian Optimization.
-    Optimizes all relevant inputs including source.
-    Saves best config to output_path.
+    Bayesian Optimization of Q-Trend settings.
     """
     def compute_mae(signal, target):
         return np.mean(np.abs(signal - target))
@@ -87,15 +121,14 @@ def train_indicator(df, output_path):
             ema_period = int(round(ema_period))
             mode = "Type B" if mode_flag > 0.5 else "Type A"
             use_ema = bool(use_ema_flag > 0.5)
-
             source_map = ["close", "open", "high", "low", "hl2", "hlc3", "ohlc4"]
             source = source_map[int(round(source_flag))]
 
             signal_series = compute_qtrend(
                 df.copy(), trend_period, atr_period, atr_mult, mode, use_ema, ema_period, source
             )
-            isp = df["manual_signal"].astype(int).values
 
+            isp = df["manual_signal"].astype(int).values
             mae = compute_mae(signal_series, isp)
             penalty = compute_transition_penalty(signal_series)
             return -(mae + penalty)
@@ -106,10 +139,10 @@ def train_indicator(df, output_path):
         "trend_period": (50, 250),
         "atr_period": (5, 30),
         "atr_mult": (0.5, 3.0),
-        "mode_flag": (0, 1),        # Type A / B
-        "use_ema_flag": (0, 1),     # No / Yes
+        "mode_flag": (0, 1),
+        "use_ema_flag": (0, 1),
         "ema_period": (2, 10),
-        "source_flag": (0, 6)       # close to ohlc4
+        "source_flag": (0, 6)
     }
 
     optimizer = BayesianOptimization(

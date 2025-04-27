@@ -1,15 +1,19 @@
+# strategy_train.py
+
 import os
 import json
 import importlib
 import numpy as np
 import pandas as pd
-from bayes_opt import BayesianOptimization
+import BayesianOptimization
 
+# === Constants ===
 DATA_PATH = "CSVdata/target.csv"
 CLUSTERS_PATH = "features/strategy_clusters.json"
 SETTINGS_DIR = "settings"
 TIMEFRAME_OPTIONS = ["1D", "2D", "3D"]
 
+# === Load Data ===
 def load_data():
     df = pd.read_csv(DATA_PATH)
     df["DateTime"] = pd.to_datetime(df["time"], unit="s")
@@ -17,6 +21,7 @@ def load_data():
     df["manual_signal"] = df["manual_signal"].ffill().fillna(0)
     return df
 
+# === Backtest Logic ===
 def backtest_equity(df, combined_signal):
     prices = df["close"].astype(float).values
     equity = [1.0]
@@ -27,14 +32,15 @@ def backtest_equity(df, combined_signal):
             equity.append(equity[-1])
     return np.array(equity)
 
+# === Transition Penalty Calculation ===
 def transition_penalty(signal):
     return np.sum(np.diff(signal) != 0) / len(signal)
 
+# === Objective Builder (No Disk Writes) ===
 def objective_builder(df, strategy_name, indicators):
     def objective_fn(**kwargs):
         signals = []
 
-        idx = 0
         for ind in indicators:
             name = ind["name"]
             module = importlib.import_module(f"indicators.{name}")
@@ -42,27 +48,18 @@ def objective_builder(df, strategy_name, indicators):
             tf_idx = int(round(kwargs[f"{name}_tf"]))
             timeframe = TIMEFRAME_OPTIONS[tf_idx]
 
-            # Reconstruct settings from search space
             tuned_settings = {}
             for j, key in enumerate(ind["settings_subset"].keys()):
                 val = kwargs[f"{name}_p{j}"]
                 tuned_settings[key] = int(round(val)) if isinstance(ind["settings_subset"][key], int) else float(val)
 
-            # Write to settings file
-            full_path = os.path.join(SETTINGS_DIR, f"{name}_settings.json")
-            with open(full_path, "r") as f:
-                all_settings = json.load(f)
-            all_settings.update(tuned_settings)
-            with open(full_path, "w") as f:
-                json.dump(all_settings, f, indent=4)
-
-            signal = module.final_signal(df.copy(), timeframe)
+            # 👉 Pass in-memory settings to final_signal (no disk write!)
+            signal = module.final_signal(df.copy(), timeframe, settings=tuned_settings)
             signals.append(signal)
 
         avg_signal = np.mean(signals, axis=0)
         combined_signal = np.where(avg_signal > 0, 1, -1)
 
-        # Evaluate strategy
         equity = backtest_equity(df, combined_signal)
         rets = np.diff(np.log(equity + 1e-8))
         sharpe = np.mean(rets) / (np.std(rets) + 1e-8)
@@ -70,8 +67,10 @@ def objective_builder(df, strategy_name, indicators):
         penalty = transition_penalty(combined_signal)
 
         return sharpe + omega - penalty * 0.5
+
     return objective_fn
 
+# === Strategy Optimizer ===
 def optimize_strategy(name, indicators, df):
     pbounds = {}
 
@@ -107,6 +106,7 @@ def optimize_strategy(name, indicators, df):
     print(f"📈 Best score: {optimizer.max['target']:.4f}")
     return optimizer.max
 
+# === Main Runner ===
 def main():
     with open(CLUSTERS_PATH, "r") as f:
         strategy_map = json.load(f)
