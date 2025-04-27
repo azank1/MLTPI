@@ -2,9 +2,11 @@ import os
 import json
 import numpy as np
 import pandas as pd
+import optuna
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
 
 FEATURES_PATH = "features/indicator_profiles.json"
 CLUSTER_OUTPUT_PATH = "features/strategy_clusters.json"
