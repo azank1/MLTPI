@@ -1,6 +1,70 @@
 {
     "S1": [
         {
+            "name": "laggy_0",
+            "preferred_timeframe": "2d",
+            "settings_subset": {},
+            "tempo_label": null
+        },
+        {
+            "name": "laggy_1",
+            "preferred_timeframe": "2d",
+            "settings_subset": {},
+            "tempo_label": null
+        },
+        {
+            "name": "laggy_2",
+            "preferred_timeframe": "2d",
+            "settings_subset": {},
+            "tempo_label": null
+        },
+        {
+            "name": "laggy_3",
+            "preferred_timeframe": "2d",
+            "settings_subset": {},
+            "tempo_label": null
+        },
+        {
+            "name": "laggy_4",
+            "preferred_timeframe": "2d",
+            "settings_subset": {},
+            "tempo_label": null
+        }
+    ],
+    "S2": [
+        {
+            "name": "noisy_0",
+            "preferred_timeframe": "1h",
+            "settings_subset": {},
+            "tempo_label": null
+        },
+        {
+            "name": "noisy_1",
+            "preferred_timeframe": "15m",
+            "settings_subset": {},
+            "tempo_label": null
+        },
+        {
+            "name": "noisy_2",
+            "preferred_timeframe": "30m",
+            "settings_subset": {},
+            "tempo_label": null
+        },
+        {
+            "name": "noisy_3",
+            "preferred_timeframe": "1h",
+            "settings_subset": {},
+            "tempo_label": null
+        },
+        {
+            "name": "noisy_4",
+            "preferred_timeframe": "15m",
+            "settings_subset": {},
+            "tempo_label": null
+        }
+    ],
+    "S3": [
+        {
             "name": "agma",
             "preferred_timeframe": "2D",
             "settings_subset": {

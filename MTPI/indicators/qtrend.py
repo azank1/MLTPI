@@ -4,7 +4,7 @@ import os
 import json
 import numpy as np
 import pandas as pd
-from bayes_opt import BayesianOptimization
+import BayesianOptimization
 
 # === Constants ===
 SETTINGS_DIR = "settings"

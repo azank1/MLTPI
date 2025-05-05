@@ -14,14 +14,14 @@
         "score": -37.9971
     },
     "qtrend": {
-        "mae_vs_isp": 0.5388,
-        "correlation_vs_isp": 0.4936,
+        "mae_vs_isp": 0.5509,
+        "correlation_vs_isp": 0.4819,
         "signal_count": 16,
-        "sharpe_ratio": 0.0531,
-        "omega_ratio": 1.1038,
+        "sharpe_ratio": 0.0503,
+        "omega_ratio": 1.0924,
         "transition_frequency": 0.0088,
-        "avg_holding_period": 113.73,
+        "avg_holding_period": 113.8,
         "preferred_timeframe": "1D",
-        "score": -39.2474
+        "score": -39.4108
     }
 }
