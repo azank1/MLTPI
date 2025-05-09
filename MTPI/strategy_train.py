@@ -5,7 +5,7 @@ import json
 import importlib
 import numpy as np
 import pandas as pd
-import BayesianOptimization
+from bayes_opt import BayesianOptimization
 
 # === Constants ===
 DATA_PATH = "CSVdata/target.csv"

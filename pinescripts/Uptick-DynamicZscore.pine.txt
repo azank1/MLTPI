@@ -1,0 +1,206 @@
+indicator("Uptrick: Dynamic Z-Score Deviation", overlay=true)
+
+// === INPUTS ===
+maLen         = input.int(50, "Main MA Length", group = 'MAIN INPUTS')
+rsiLen        = input.int(14, "RSI Length", group = 'MAIN INPUTS')
+zLookback     = input.int(50, "Z-Score Lookback", group = 'MAIN INPUTS')
+priceZThresh  = input.float(2.0, "Price Z-Score Threshold", group = 'MAIN INPUTS')
+rsiZThresh    = input.float(1.5, "RSI Z-Score Threshold", group = 'MAIN INPUTS')
+rsiEmaLen     = input.int(8, "RSI EMA Filter Length", group = 'MAIN INPUTS')
+almaOffset    = input.float(0.85, "ALMA Offset", group = 'MAIN INPUTS')
+almaSigma     = input.float(6, "ALMA Sigma", group = 'MAIN INPUTS')
+showSignals   = input.bool(true, "Show Reversal Signals", group = 'MAIN INPUTS')
+enableSlopeColor = true
+slopeLen      = input.int(10, "Slope Sensitivity", minval=1, group = 'MAIN INPUTS')
+src           = close
+
+// === CORE MA (ALMA + ZLMA) ===
+alma     = ta.alma(src, maLen, almaOffset, almaSigma)
+zlma     = ta.ema(2 * src - src[maLen], maLen)  // Approximate ZLMA
+comboMA  = (alma + zlma) / 2
+
+// === RSI + EMA Filter ===
+rsi         = ta.rsi(src, rsiLen)
+rsiSmooth   = ta.alma(rsi, 10, 0.85, 6)
+rsiEma      = ta.ema(rsi, rsiEmaLen)
+
+// === Z-SCORE of RSI
+rsiMean     = ta.sma(rsiSmooth, zLookback)
+rsiStdev    = ta.stdev(rsiSmooth, zLookback)
+z_rsi       = (rsiSmooth - rsiMean) / (rsiStdev + 1e-10)
+
+// === Z-SCORE of Price vs MA
+priceDist     = src - comboMA
+priceDistMean = ta.sma(priceDist, zLookback)
+priceDistStd  = ta.stdev(priceDist, zLookback)
+z_price       = (priceDist - priceDistMean) / (priceDistStd + 1e-10)
+
+// === Reversal Signal Conditions (Filtered)
+buyCond  = showSignals and z_price < -priceZThresh and z_rsi < -rsiZThresh and rsiEma < 40 and close > close[1]
+sellCond = showSignals and z_price >  priceZThresh and z_rsi >  rsiZThresh and rsiEma > 60 and close < close[1]
+
+// === MA Slope Coloring
+slope    = comboMA - comboMA[slopeLen]
+maColor = enableSlopeColor ? (slope > 0 ? color.rgb(92, 240, 215) : slope < 0 ? color.rgb(179, 42, 195) : color.gray) : color.white
+
+
+
+
+// === SHADOW SETTINGS ===
+showShadow       = input.bool(true, "Show MA Shadow", group = 'SHADOW SETTINGS')
+shadowLayers     = input.int(3, "Shadow Layer Count", minval=1, maxval=4, group = 'SHADOW SETTINGS')
+shadowBaseMult   = input.float(1.0, "Base Shadow ATR Multiplier", group = 'SHADOW SETTINGS')
+smoothGradient   = input.bool(true, "Smooth Color Transitions", group = 'SHADOW SETTINGS')
+atrLength        = input.int(14, "ATR Length for Shadow", group = 'SHADOW SETTINGS')
+shadowATR        = ta.atr(atrLength)
+
+// === BASE COLORS
+bullColor        = color.rgb(92, 240, 215)
+bearColor        = color.rgb(179, 42, 195)
+
+// === MA SLOPE & SMOOTH COLOR TRANSITION
+rawSlope         = comboMA - comboMA[slopeLen]
+smoothColorR     = ta.ema(rawSlope > 0 ? color.r(bullColor) : color.r(bearColor), 15)
+smoothColorG     = ta.ema(rawSlope > 0 ? color.g(bullColor) : color.g(bearColor), 15)
+smoothColorB     = ta.ema(rawSlope > 0 ? color.b(bullColor) : color.b(bearColor), 15)
+maCoreColor      = smoothGradient 
+     ? color.rgb(int(smoothColorR), int(smoothColorG), int(smoothColorB)) 
+     : rawSlope > 0 ? bullColor : rawSlope < 0 ? bearColor : color.gray
+
+// === SHADOW LAYER 1
+width1 = shadowBaseMult * 1 * shadowATR
+u1 = plot(showShadow ? comboMA + width1 : na, title="Upper Shadow 1", display=display.none)
+l1 = plot(showShadow ? comboMA - width1 : na, title="Lower Shadow 1", display=display.none)
+fill(u1, l1, color=showShadow ? color.new(maCoreColor, 75) : na)
+
+// === SHADOW LAYER 2
+width2 = shadowBaseMult * 2 * shadowATR
+u2 = plot(showShadow and shadowLayers >= 2 ? comboMA + width2 : na, title="Upper Shadow 2", display=display.none)
+l2 = plot(showShadow and shadowLayers >= 2 ? comboMA - width2 : na, title="Lower Shadow 2", display=display.none)
+fill(u2, l2, color=showShadow and shadowLayers >= 2 ? color.new(maCoreColor, 85) : na)
+
+// === SHADOW LAYER 3
+width3 = shadowBaseMult * 3 * shadowATR
+u3 = plot(showShadow and shadowLayers >= 3 ? comboMA + width3 : na, title="Upper Shadow 3", display=display.none)
+l3 = plot(showShadow and shadowLayers >= 3 ? comboMA - width3 : na, title="Lower Shadow 3", display=display.none)
+fill(u3, l3, color=showShadow and shadowLayers >= 3 ? color.new(maCoreColor, 92) : na)
+
+// === SHADOW LAYER 4
+width4 = shadowBaseMult * 4 * shadowATR
+u4 = plot(showShadow and shadowLayers == 4 ? comboMA + width4 : na, title="Upper Shadow 4", display=display.none)
+l4 = plot(showShadow and shadowLayers == 4 ? comboMA - width4 : na, title="Lower Shadow 4", display=display.none)
+fill(u4, l4, color=showShadow and shadowLayers == 4 ? color.new(maCoreColor, 96) : na)
+
+// === MAIN MA LINE
+plot(comboMA, title="Smoothed MA (ALMA + ZLMA)", color=maCoreColor, linewidth=2)
+
+useBarColor = input.bool(true, "Use Bar Coloring", group = 'BAR COLOR')
+barcolor(useBarColor ? maCoreColor : na)
+
+// === Plot Reversal Signals
+
+// === Signal Size Toggle
+useDynamicSize = input.bool(true, "Use Dynamic Signal Size", group = 'SIGNAL CUSTOMIZATION')
+
+// === Signal Strength Score
+signalStrength = math.abs(z_price) + math.abs(z_rsi)
+
+// === Default fallback size
+defaultSize = size.small
+
+// === Plot Buy Signals (Dynamic if enabled)
+plotshape(
+     buyCond and useDynamicSize and signalStrength >= 6,
+     title="Buy Strong",
+     location=location.belowbar,
+     style=shape.labelup,
+     color=color.rgb(92, 240, 215),
+     size=size.normal,
+     text="𝐔𝐩",
+     textcolor=#000000
+ )
+
+plotshape(
+     buyCond and useDynamicSize and signalStrength >= 4 and signalStrength < 6,
+     title="Buy Medium",
+     location=location.belowbar,
+     style=shape.labelup,
+     color=color.rgb(92, 240, 215),
+     size=size.small,
+     text="𝐔𝐩",
+     textcolor=#000000
+ )
+
+plotshape(
+     buyCond and useDynamicSize and signalStrength < 4,
+     title="Buy Weak",
+     location=location.belowbar,
+     style=shape.labelup,
+     color=color.rgb(92, 240, 215),
+     size=size.tiny,
+     text="𝐔𝐩",
+     textcolor=#000000
+ )
+
+// === Fixed size fallback (if dynamic disabled)
+plotshape(
+     buyCond and not useDynamicSize,
+     title="Buy Fixed",
+     location=location.belowbar,
+     style=shape.labelup,
+     color=color.rgb(92, 240, 215),
+     size=defaultSize,
+     text="𝐔𝐩",
+     textcolor=#000000
+ )
+
+// === Plot Sell Signals (Dynamic if enabled)
+plotshape(
+     sellCond and useDynamicSize and signalStrength >= 6,
+     title="Sell Strong",
+     location=location.abovebar,
+     style=shape.labeldown,
+     color=color.rgb(179, 42, 195),
+     size=size.normal,
+     text="𝐃𝐨𝐰𝐧",
+     textcolor=color.white
+ )
+
+plotshape(
+     sellCond and useDynamicSize and signalStrength >= 4 and signalStrength < 6,
+     title="Sell Medium",
+     location=location.abovebar,
+     style=shape.labeldown,
+     color=color.rgb(179, 42, 195),
+     size=size.small,
+     text="𝐃𝐨𝐰𝐧",
+     textcolor=color.white
+ )
+
+plotshape(
+     sellCond and useDynamicSize and signalStrength < 4,
+     title="Sell Weak",
+     location=location.abovebar,
+     style=shape.labeldown,
+     color=color.rgb(179, 42, 195),
+     size=size.tiny,
+     text="𝐃𝐨𝐰𝐧",
+     textcolor=color.white
+ )
+
+// === Fixed size fallback (if dynamic disabled)
+plotshape(
+     sellCond and not useDynamicSize,
+     title="Sell Fixed",
+     location=location.abovebar,
+     style=shape.labeldown,
+     color=color.rgb(179, 42, 195),
+     size=defaultSize,
+     text="𝐃𝐨𝐰𝐧",
+     textcolor=color.white
+ )
+
+
+
+alertcondition(buyCond, title="Buy Alert", message="Uptrick Buy Reversal Signal")
+alertcondition(sellCond, title="Sell Alert", message="Uptrick Sell Reversal Signal")

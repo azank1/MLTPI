@@ -1,0 +1,129 @@
+/@version=6
+indicator("Gaussian Smooth Trend | QuantEdgeB", shorttitle = "GST | QB",overlay = true)
+
+import TradingView/ta/9
+
+// Design Setup
+ColMode = input.string("Strategy", title = "Color Mode", group = "Visual | QuantEdgeB", options = ["Strategy", "Solar","Warm","Cool","Classic","Magic"])
+LABEL   = input.bool(false,"Long/Cash Signal Lable" , group = "Visual | QuantEdgeB")
+
+[color_up, color_dn, color_nu] = switch ColMode
+    "Strategy"=> [color.rgb(23, 191, 238), color.rgb(103, 2, 2),color.gray]
+    "Solar"   => [color.rgb(43, 56, 247), #ee6728,color.gray]
+    "Warm"    => [#ffbb00, #770737,color.gray]
+    "Cool"    => [#0aede9, color.rgb(12, 16, 218),color.gray]
+    "Classic" => [#04f7e7, color.maroon,color.gray]
+    "Magic"   => [color.rgb(114, 44, 246), color.rgb(214, 245, 42),color.gray]
+
+// Color Palette
+color col_up1     = color_up
+color col_up2     = color.new(color_up, 20)
+color col_up3     = color.new(color_up, 100)
+color col_dn1     = color_dn
+color col_dn2     = color.new(color_dn, 20)
+color col_nu2     = color.new(color_dn, 60)
+
+//###############################################################################################################################################################################################################################################//
+// DEMA Function
+F_DEMA(SRC, LEN) =>
+    E1 = ta.ema(SRC, LEN)
+    E2 = ta.ema(E1, LEN)
+
+    DEMA = 2 * E1 - E2
+
+    DEMA
+
+
+src_dema = input(close,"DEMA Source", group = "DEMA")
+len_dema = input.int(7,"Dema Length", group = "DEMA")
+
+DEMA = F_DEMA(src_dema, len_dema)
+
+//###############################################################################################################################################################################################################################################//
+// Gaussian Funtion
+len_FG     = input.int(4, title = 'Gaussian length', minval = 1, group = 'Gaussian Filter', step = 1)
+sigma_FG   = input.float(2.0, title = 'Gaussian Sigma', minval = 0.1, step = 0.1, group = 'Gaussian Filter')
+
+F_Gaussian(src, len_FG, sigma) =>
+    sum_G = 0.0
+    weightedSum_G = 0.0
+    for i = 0 to len_FG - 1 by 1
+        weight = math.exp(-0.5 * math.pow((i - (len_FG - 1) / 2) / sigma, 2))
+        sum_G += weight
+        weightedSum_G +=  src[i] * weight
+
+    Final_Gaussian = weightedSum_G / sum_G
+
+    Final_Gaussian
+
+filter_Gaussian = F_Gaussian(DEMA, len_FG, sigma_FG)
+
+//###############################################################################################################################################################################################################################################//
+// SMMA Function
+F_SMMA(src_s, len_s) =>
+    float SMMA = na
+    dema = F_DEMA(src_s, len_s)
+    if bar_index >= len_s - 1
+        alpha_val = 1 / len_s
+        SMMA := na(SMMA[1]) ? dema : (src_s - SMMA[1]) * alpha_val + SMMA[1]
+        SMMA
+    else
+        SMMA := src_s
+        SMMA
+    SMMA
+
+len_S = input(12, 'SMMA length', group = 'SMMA')
+SMMA  = F_SMMA(filter_Gaussian, len_S)
+
+//###############################################################################################################################################################################################################################################//
+// SD Filter
+len_SD    = input.int(30, title = 'SD length', minval = 1, step = 1, group = 'SD')
+mult_SDup   = input.float(2.5, minval = 0, step = 0.1, title = 'SD Mult Up', group = 'SD')
+mult_SDdn   = input.float(1.8, minval = 0, step = 0.1, title = 'SD Mult Down', group = 'SD')
+filter_SD   = ta.stdev(SMMA,len_SD)
+
+
+LongV = SMMA + filter_SD * mult_SDup
+ShortV = SMMA - filter_SD * mult_SDdn
+
+//###############################################################################################################################################################################################################################################//
+// Final Signal 
+Long_C  = close > LongV
+Short_C = close < ShortV
+
+
+var QB = 0
+
+if Long_C and not Short_C
+    QB := 1
+    QB
+
+if Short_C
+    QB := -1
+    QB
+
+
+color = QB == 1 ? color_up : QB == -1 ? color_dn : color_nu
+color_SD = color.new(color,45)
+
+pS = plot(SMMA, color = color, linewidth = 2)
+upperSMMASD = plot(LongV, title = 'Upper SMMA SD ', color = color.new(color.white, 70), linewidth = 1)
+lowerSMMASD = plot(ShortV, title = 'Lower SMMA SD', color = color.new(color.white, 70), linewidth = 1)
+
+fill(upperSMMASD, pS, LongV, SMMA,  QB==1 ? col_up2 : QB == -1 ? col_dn2 : #0000004d, na)
+fill(lowerSMMASD, pS, ShortV, SMMA,  QB==-1 ? col_dn2 : QB == 1 ? col_up2 : color.rgb(0, 0, 0, 70), na)
+
+plotcandle(open, high, low, close, 'BarColor', color = color, bordercolor = color, wickcolor = color, force_overlay = true)
+
+//###############################################################################################################################################################################################################################################//
+//###############################################################################################################################################################################################################################################//
+
+// Plot Labels
+if QB == -1 and QB[1] == -1 and  QB[2] == 1 and LABEL// Only plot when the signal changes
+    label.new(x=bar_index, y= high * 1.08, text= "𝓢𝓱𝓸𝓻𝓽" , color=  color_dn, style=  label.style_label_down  ,textcolor=color.white, size=size.tiny,force_overlay = true)
+
+if QB == 1 and QB[1] == 1 and  QB[2] == -1 and LABEL// Only plot when the signal changes
+    label.new(x=bar_index, y= low * 0.9, text= "𝓛𝓸𝓷𝓰" , color=  color_up, style=  label.style_label_up  ,textcolor=color.white, size=size.tiny,force_overlay = true)
+
+alertcondition(ta.crossover(QB, 0), title="GST Long", message="GST Long {{exchange}}:{{ticker}}")
+alertcondition(ta.crossunder(QB, 0), title="GST Short", message="GST Short {{exchange}}:{{ticker}}")

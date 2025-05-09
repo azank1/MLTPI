@@ -1,0 +1,18 @@
+study(title="SMI Ergodic Oscillator")
+fastPeriod = input(4, minval=1)
+slowPeriod = input(8, minval=1)
+SmthLen = input(3, minval=1)
+TopBand = input(0.5, step=0.1)
+LowBand = input(-0.5, step=0.1)
+hline(0, color=gray, linestyle=dashed)
+hline(TopBand, color=red, linestyle=line)
+hline(LowBand, color=green, linestyle=line)
+xPrice = close
+xPrice1 = xPrice - xPrice[1]
+xPrice2 = abs(xPrice - xPrice[1])
+xSMA_R = ema(ema(xPrice1,fastPeriod),slowPeriod)
+xSMA_aR = ema(ema(xPrice2, fastPeriod),slowPeriod)
+xSMI = xSMA_R / xSMA_aR
+xEMA_SMI = ema(xSMI, SmthLen)
+plot(xSMI, color=green, title="Ergotic SMI")
+plot(xEMA_SMI, color=red, title="SigLin")
