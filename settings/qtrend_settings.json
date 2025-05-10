@@ -1,9 +1,1 @@
-{
-    "trend_period": 50,
-    "atr_period": 6,
-    "atr_mult": 0.5549164461189522,
-    "mode": "Type B",
-    "use_ema": false,
-    "ema_period": 5,
-    "source": "high"
-}
+{"trend_period": 50, "atr_period": 6, "atr_mult": 0.5549164461189522, "mode": "Type B", "use_ema": false, "ema_period": 5, "source": "high"}

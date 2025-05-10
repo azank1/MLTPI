@@ -1,6 +1,5 @@
 {
-    "dema_length": 39,
-    "gauss_length": 5,
-    "threshold": 0.5690743895210377,
-    "preferred_timeframe": "2D"
+    "window": 4,
+    "smooth_factor": 0.05249299584574553,
+    "directional_bias": -0.8316959863483095
 }

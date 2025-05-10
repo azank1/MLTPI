@@ -1,12 +1,48 @@
+# indicators/trendZ.py
+
+import os
+import json
 import numpy as np
 import pandas as pd
-import json
 from bayes_opt import BayesianOptimization
-from sklearn.metrics import mean_absolute_error
 
-def final_signal(df, window=10, timeframe="1D"):
+# === Constants ===
+SETTINGS_DIR = "settings"
+SETTINGS_FILE = "trendZ_settings.json"
+
+# === Settings Loader ===
+def load_settings(settings=None):
+    if settings is None:
+        with open(os.path.join(SETTINGS_DIR, SETTINGS_FILE), "r") as f:
+            settings = json.load(f)
+    return settings
+
+# === Core trendZ Computation ===
+def compute_trendZ(df, period, smoothing_factor, bias_thresh):
+    """
+    trendZ: slope of smoothed rolling mean vs bias threshold.
+    """
+    price = df["close"]
+    trend = price.rolling(window=period).mean()
+    smoothed = trend.ewm(alpha=smoothing_factor).mean()
+    slope = smoothed.diff()
+
+    signal = np.where(slope > bias_thresh, 1, -1)
+    return pd.Series(signal, index=df.index)
+
+# === Final Signal Interface ===
+def final_signal(df, timeframe="1D", settings=None):
+    """
+    Main public method to generate trendZ signals.
+    """
+    settings = load_settings(settings)
+
+    period = int(settings.get("period", 14))
+    smoothing_factor = float(settings.get("smoothing_factor", 0.1))
+    bias_thresh = float(settings.get("bias_thresh", 0.0))
+
     if timeframe != "1D":
-        df = df.resample(timeframe).agg({
+        df_resampled = df.resample(timeframe).agg({
             'open': 'first',
             'high': 'max',
             'low': 'min',
@@ -14,47 +50,61 @@ def final_signal(df, window=10, timeframe="1D"):
             'manual_signal': 'last'
         }).dropna()
     else:
-        df = df.copy()
+        df_resampled = df.copy()
 
-    df['ma'] = df['close'].rolling(window=window).mean()
-    df['slope'] = df['ma'].diff()
-    df['signal'] = 0
-    df.loc[df['slope'] > 0, 'signal'] = 1
-    df.loc[df['slope'] < 0, 'signal'] = -1
-    return df['signal'].fillna(0)
+    signal_series = compute_trendZ(df_resampled, period, smoothing_factor, bias_thresh)
+    aligned_signal = signal_series.reindex(df.index, method='ffill').fillna(-1).astype(int)
+    return aligned_signal.values
 
-def evaluate(window, df, manual_signal, timeframe):
-    try:
-        signal = final_signal(df.copy(), int(window), timeframe)
-        score = -mean_absolute_error(manual_signal.reindex(signal.index).fillna(0), signal)
-        return score
-    except Exception:
-        return -1e6
-
+# === Training Interface ===
 def train_indicator(df, output_path):
-    manual_signal = df["manual_signal"]
-    best_score = -1e6
-    best_params = {}
-    best_tf = "1D"
+    """
+    Bayesian optimization to find best trendZ parameters.
+    """
+    def compute_mae(signal, target):
+        return np.mean(np.abs(signal - target))
 
-    for tf in ["1D", "2D", "3D"]:
-        def bo_wrapper(window):
-            return evaluate(window, df, manual_signal, tf)
+    def compute_transition_penalty(signal, penalty_coef=0.1):
+        transitions = np.sum(np.diff(signal) != 0)
+        return penalty_coef * transitions / (len(signal) - 1)
 
-        optimizer = BayesianOptimization(
-            f=bo_wrapper,
-            pbounds={"window": (3, 30)},
-            random_state=42,
-            verbose=0
-        )
-        optimizer.maximize(init_points=3, n_iter=10)
+    def objective(period, smoothing_factor, bias_thresh):
+        period = int(round(period))
+        smoothing_factor = float(smoothing_factor)
+        bias_thresh = float(bias_thresh)
 
-        if optimizer.max['target'] > best_score:
-            best_score = optimizer.max['target']
-            best_params = optimizer.max['params']
-            best_params['window'] = int(best_params['window'])
-            best_tf = tf
+        signal = compute_trendZ(df, period, smoothing_factor, bias_thresh)
+        signal = signal.fillna(-1).astype(int)
 
-    best_params["preferred_timeframe"] = best_tf
+        target_signal = df["manual_signal"].astype(int).values
+        mae = compute_mae(signal.values, target_signal)
+        penalty = compute_transition_penalty(signal.values)
+
+        return -(mae + penalty)
+
+    pbounds = {
+        "period": (5, 50),
+        "smoothing_factor": (0.01, 0.5),
+        "bias_thresh": (-0.5, 0.5)
+    }
+
+    optimizer = BayesianOptimization(
+        f=objective,
+        pbounds=pbounds,
+        random_state=42,
+        verbose=0
+    )
+    optimizer.maximize(init_points=5, n_iter=25)
+
+    best = optimizer.max["params"]
+    best_settings = {
+        "period": int(round(best["period"])),
+        "smoothing_factor": float(best["smoothing_factor"]),
+        "bias_thresh": float(best["bias_thresh"])
+    }
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w") as f:
-        json.dump(best_params, f, indent=4)
+        json.dump(best_settings, f, indent=4)
+
+    print(f"✅ trendZ training complete. Best settings saved to {output_path}")

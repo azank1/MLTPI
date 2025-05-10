@@ -1,4 +1,1 @@
-{
-    "momentum_window": 12,
-    "preferred_timeframe": "3D"
-}
+{"fast_window": 9, "slow_window": 10, "threshold": -0.6363500655857988}

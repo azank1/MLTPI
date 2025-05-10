@@ -1,7 +1,1 @@
-{
-    "length": 37,
-    "volatilityPeriod": 30,
-    "sigma_fixed": 0.5737840892368019,
-    "adaptive": false,
-    "thresh": -0.1027267165206659
-}
+{"length": 37, "volatilityPeriod": 30, "sigma_fixed": 0.5737840892368019, "adaptive": false, "thresh": -0.1027267165206659}

@@ -1,19 +1,53 @@
+# indicators/zscoreMA.py
+
+import os
+import json
 import numpy as np
 import pandas as pd
-import json
 from bayes_opt import BayesianOptimization
-from sklearn.metrics import mean_absolute_error
 
-def alma(series, window, offset, sigma):
-    m = offset * (window - 1)
-    s = window / sigma
-    weights = np.exp(-((np.arange(window) - m)**2) / (2 * s * s))
-    weights /= weights.sum()
-    return np.convolve(series, weights, mode='same')
+# === Constants ===
+SETTINGS_DIR = "settings"
+SETTINGS_FILE = "zscoreMA_settings.json"
 
-def final_signal(df, alma_window=14, offset=0.85, sigma=6, z_threshold=1.5, timeframe="1D"):
+# === Settings Loader ===
+def load_settings(settings=None):
+    if settings is None:
+        with open(os.path.join(SETTINGS_DIR, SETTINGS_FILE), "r") as f:
+            settings = json.load(f)
+    return settings
+
+# === Core zscoreMA Computation ===
+def compute_zscoreMA(df, ma_period, z_thresh, use_ema):
+    """
+    zscoreMA: z-score of price from moving average threshold.
+    """
+    price = df["close"]
+
+    if use_ema:
+        ma = price.ewm(span=ma_period, adjust=False).mean()
+    else:
+        ma = price.rolling(window=ma_period).mean()
+
+    std = price.rolling(window=ma_period).std().replace(0, 1e-8)
+    zscore = (price - ma) / std
+
+    signal = np.where(zscore > z_thresh, 1, np.where(zscore < -z_thresh, -1, 0))
+    return pd.Series(signal, index=df.index)
+
+# === Final Signal Interface ===
+def final_signal(df, timeframe="1D", settings=None):
+    """
+    Main public method to generate zscoreMA signals.
+    """
+    settings = load_settings(settings)
+
+    ma_period = int(settings.get("ma_period", 20))
+    z_thresh = float(settings.get("z_thresh", 1.0))
+    use_ema = bool(settings.get("use_ema", False))
+
     if timeframe != "1D":
-        df = df.resample(timeframe).agg({
+        df_resampled = df.resample(timeframe).agg({
             'open': 'first',
             'high': 'max',
             'low': 'min',
@@ -21,59 +55,61 @@ def final_signal(df, alma_window=14, offset=0.85, sigma=6, z_threshold=1.5, time
             'manual_signal': 'last'
         }).dropna()
     else:
-        df = df.copy()
+        df_resampled = df.copy()
 
-    price = df["close"]
-    alma_series = pd.Series(alma(price.values, int(alma_window), offset, sigma), index=df.index)
-    z = (price - alma_series) / (price.rolling(int(alma_window)).std() + 1e-9)
+    signal_series = compute_zscoreMA(df_resampled, ma_period, z_thresh, use_ema)
+    aligned_signal = signal_series.reindex(df.index, method='ffill').fillna(-1).astype(int)
+    return aligned_signal.values
 
-    df["signal"] = 0
-    df.loc[z > z_threshold, "signal"] = 1
-    df.loc[z < -z_threshold, "signal"] = -1
-    return df["signal"].fillna(0)
-
-def evaluate(alma_window, offset, sigma, z_threshold, df, manual_signal, timeframe):
-    try:
-        signal = final_signal(df.copy(),
-                              alma_window=int(alma_window),
-                              offset=offset,
-                              sigma=sigma,
-                              z_threshold=z_threshold,
-                              timeframe=timeframe)
-        score = -mean_absolute_error(manual_signal.reindex(signal.index).fillna(0), signal)
-        return score
-    except Exception:
-        return -1e6
-
+# === Training Interface ===
 def train_indicator(df, output_path):
-    manual_signal = df["manual_signal"]
-    best_score = -1e6
-    best_params = {}
-    best_tf = "1D"
+    """
+    Bayesian optimization to find best zscoreMA parameters.
+    """
+    def compute_mae(signal, target):
+        return np.mean(np.abs(signal - target))
 
-    for tf in ["1D", "2D", "3D"]:
-        def bo_wrapper(alma_window, offset, sigma, z_threshold):
-            return evaluate(alma_window, offset, sigma, z_threshold, df, manual_signal, tf)
+    def compute_transition_penalty(signal, penalty_coef=0.1):
+        transitions = np.sum(np.diff(signal) != 0)
+        return penalty_coef * transitions / (len(signal) - 1)
 
-        optimizer = BayesianOptimization(
-            f=bo_wrapper,
-            pbounds={
-                "alma_window": (5, 40),
-                "offset": (0.1, 1.0),
-                "sigma": (2, 10),
-                "z_threshold": (0.5, 3.0)
-            },
-            random_state=42,
-            verbose=0
-        )
-        optimizer.maximize(init_points=3, n_iter=10)
+    def objective(ma_period, z_thresh, use_ema_flag):
+        ma_period = int(round(ma_period))
+        z_thresh = float(z_thresh)
+        use_ema = bool(use_ema_flag > 0.5)
 
-        if optimizer.max["target"] > best_score:
-            best_score = optimizer.max["target"]
-            best_params = optimizer.max["params"]
-            best_params["alma_window"] = int(best_params["alma_window"])
-            best_tf = tf
+        signal = compute_zscoreMA(df, ma_period, z_thresh, use_ema)
+        signal = signal.fillna(-1).astype(int)
 
-    best_params["preferred_timeframe"] = best_tf
+        target_signal = df["manual_signal"].astype(int).values
+        mae = compute_mae(signal.values, target_signal)
+        penalty = compute_transition_penalty(signal.values)
+
+        return -(mae + penalty)
+
+    pbounds = {
+        "ma_period": (5, 50),
+        "z_thresh": (0.5, 3.0),
+        "use_ema_flag": (0, 1)
+    }
+
+    optimizer = BayesianOptimization(
+        f=objective,
+        pbounds=pbounds,
+        random_state=42,
+        verbose=0
+    )
+    optimizer.maximize(init_points=5, n_iter=25)
+
+    best = optimizer.max["params"]
+    best_settings = {
+        "ma_period": int(round(best["ma_period"])),
+        "z_thresh": float(best["z_thresh"]),
+        "use_ema": bool(best["use_ema_flag"] > 0.5)
+    }
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w") as f:
-        json.dump(best_params, f, indent=4)
+        json.dump(best_settings, f, indent=4)
+
+    print(f"✅ zscoreMA training complete. Best settings saved to {output_path}")

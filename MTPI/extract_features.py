@@ -7,7 +7,7 @@ import pandas as pd
 FEATURES_PATH = "features/indicator_profiles.json"
 SETTINGS_DIR = "settings"
 DATA_PATH = "CSVdata/target.csv"
-INDICATOR_NAMES = ["agma", "qtrend", "gstX", "zscoreMA"]  # Add others like "kalman", "firefly", etc.
+INDICATOR_NAMES = ["agma", "qtrend","gstX"]  # Add others like "kalman", "firefly", etc.
 
 def load_data():
     df = pd.read_csv(DATA_PATH)

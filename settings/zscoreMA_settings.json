@@ -1,7 +1,1 @@
-{
-    "alma_window": 17,
-    "offset": 0.988620286684463,
-    "sigma": 7.415451268401154,
-    "z_threshold": 0.8570308505316477,
-    "preferred_timeframe": "2D"
-}
+{"ma_period": 50, "z_thresh": 0.5184486458809902, "use_ema": false}

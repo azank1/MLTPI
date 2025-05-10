@@ -11,7 +11,7 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 import optuna
 
-FEATURES_PATH = "features/indicator_profiles_spoof.json"
+FEATURES_PATH = "features/indicator_profiles.json"
 CLUSTER_OUTPUT_PATH = "features/strategy_clusters.json"
 SETTINGS_DIR = "settings"
 DATA_PATH = "CSVdata/target.csv"

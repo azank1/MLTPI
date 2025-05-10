@@ -2,7 +2,7 @@ import os
 import importlib
 import pandas as pd
 
-INDICATOR_NAMES = ["agma", "qtrend", "trendZ", "momentumX", "gstX", "zscoreMA"]  # Just add names here to include more indicators
+INDICATOR_NAMES = ["agma", "qtrend","gstX"]  # Just add names here to include more indicators
 SETTINGS_DIR = "settings"
 DATA_PATH = "CSVdata/target.csv"
 

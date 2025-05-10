@@ -1,0 +1,20 @@
+{
+    "S1": {
+        "agma": {
+            "tf": "2D",
+            "settings": {
+                "adaptive": false,
+                "length": 23
+            },
+            "score": -0.01735819529550209
+        },
+        "qtrend": {
+            "tf": "2D",
+            "settings": {
+                "use_ema": false,
+                "trend_period": 39
+            },
+            "score": -0.01830095283209533
+        }
+    }
+}
