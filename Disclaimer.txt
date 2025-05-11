@@ -1,0 +1,12 @@
+The contents of this document, including all research, models, algorithms, and strategy
+outlines, are intended for educational and research purposes only. MLTPI (Machine
+Learning Trend Probability Indicator) is a complex signal engineering framework designed
+for use by financial analysts, quantitative researchers, and professional practitioners in
+algorithmic trading environments.
+
+This system involves advanced statistical modeling, unsupervised clustering, and
+optimization techniques that assume a foundational understanding of quantitative finance.
+It is not intended for casual retail investors or individuals lacking deep financial expertise.
+No guarantee of performance is expressed or implied. Use of this framework in live financial
+environments should only be undertaken by those capable of understanding and managing
+quantitative risk.
