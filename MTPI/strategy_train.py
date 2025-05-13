@@ -1,4 +1,3 @@
-
 import os
 import json
 import importlib
@@ -27,7 +26,7 @@ def compute_reward(signal, df, penalty_weight=0.5, target_hold_range=(5, 15)):
     prices = df["close"].astype(float).values
     equity = [1.0]
     for i in range(1, len(prices)):
-        if signal[i] == 1:
+        if signal.iloc[i] == 1:
             equity.append(equity[-1] * (prices[i] / prices[i-1]))
         else:
             equity.append(equity[-1])
@@ -58,7 +57,7 @@ def compute_reward(signal, df, penalty_weight=0.5, target_hold_range=(5, 15)):
     total_score = reward + hold_score - penalty_weight * flip_rate
     return total_score
 
-# === Strategy Objective Function Builder ===
+# === Objective Function Builder ===
 def objective_builder(df, strategy_name, indicators):
     def objective_fn(**kwargs):
         signals = []
@@ -115,7 +114,7 @@ def optimize_strategy(name, indicators, df):
     print(f"📈 Best score: {optimizer.max['target']:.4f}")
     return optimizer.max
 
-# === Main Runner ===
+# === Main Execution ===
 def main():
     with open(CLUSTERS_PATH, "r") as f:
         strategy_map = json.load(f)
@@ -126,19 +125,22 @@ def main():
     for strategy_name, indicators in strategy_map.items():
         print(f"\n🚀 Optimizing strategy {strategy_name} with {len(indicators)} indicators...")
         opt_result = optimize_strategy(strategy_name, indicators, df)
+
         result[strategy_name] = {}
 
         for ind in indicators:
             name = ind["name"]
-            tf_idx = int(round(opt_result[f"{name}_tf"]))
+            tf_idx = int(round(opt_result["params"][f"{name}_tf"]))
             tf = TIMEFRAME_OPTIONS[tf_idx]
+
             result[strategy_name][name] = {
                 "tf": tf,
                 "settings": {}
             }
+
             for j, key in enumerate(ind["settings_subset"].keys()):
                 param = f"{name}_p{j}"
-                val = opt_result[param]
+                val = opt_result["params"][param]
                 result[strategy_name][name]["settings"][key] = (
                     int(round(val)) if isinstance(ind["settings_subset"][key], int) else float(val)
                 )

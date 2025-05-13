@@ -1,19 +1,17 @@
 {
     "S1": {
         "agma": {
-            "score": -0.01735819529550209,
             "tf": "1D",
             "settings": {
-                "adaptive": false,
+                "adaptive": 1,
                 "length": 23
             }
         },
         "qtrend": {
-            "score": -0.01830095283209533,
-            "tf": "1D",
+            "tf": "2D",
             "settings": {
-                "use_ema": false,
-                "trend_period": 39
+                "use_ema": 1,
+                "trend_period": 42
             }
         }
     }
