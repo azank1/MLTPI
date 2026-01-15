@@ -12,7 +12,7 @@ The MTPI framework is designed to:
 - Identify optimal indicator settings for trend detection against a known signal profile using machine learning.
 - Combine trained indicators into a cohesive **strategy** via weighted aggregation:
   \[
-  _H(\a**pha) = w_1 \c**dot I_1 + w_2 \**cdot I_2 + \ldots** + w_n \cdot I_n*** = \t**ext***{Act**ual** Signal}_
+  H(\alpha) = w_1 \cdot I_1 + w_2 \cdot I_2 + \ldots + w_n \cdot I_n = \text{Actual Signal}
   \]
   
 - Optimize both indicator configurations and their respective weights to produce robust signals aligned with medium-term market movements.

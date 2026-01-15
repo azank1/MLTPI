@@ -160,4 +160,6 @@ def main():
 
     print(f"✅ Strategy clusters saved to {CLUSTER_OUTPUT_PATH}")
 
-main()
+
+if __name__ == "__main__":
+    main()
